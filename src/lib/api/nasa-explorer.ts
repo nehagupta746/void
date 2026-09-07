@@ -5,6 +5,19 @@ const NASA_NEO_BASE_URL = "https://api.nasa.gov/neo/rest/v1";
 const NASA_TIMEOUT_MS = 12000;
 const NASA_CACHE_SECONDS = 900;
 const SEARCH_POOL_SIZE = 20;
+const JPL_CATALOG_URL = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,pdes,name&sb-kind=a&limit=10000";
+
+const LOCAL_SUGGESTIONS: ExplorerObjectSummary[] = [
+  "1 Ceres", "2 Pallas", "3 Juno", "4 Vesta", "433 Eros", "951 Gaspra", "1221 Amor", "1566 Icarus",
+  "1862 Apollo", "2201 Oljato", "3200 Phaethon", "4179 Toutatis", "433 Eros", "99942 Apophis", "101955 Bennu",
+  "47 Aglaja", "139 Juewa", "948 Jucunda", "1062 Ljuba", "162173 Ryugu", "25143 Itokawa", "303 Josephina", "383 Janina", "65803 Didymos",
+  "1942 Jedda", "314 Rosalia", "335 Roberta", "468 Lina", "575 Renate", "708 Raphaela", "769 Tatjana", "787 Moskva", "951 Gaspra",
+  "66391 Moshup", "99907 1989 VA", "138911 2001 AE2",
+].map((designation) => ({ id: designation.split(" ")[0], designation, estimatedDiameterMinKm: null, estimatedDiameterMaxKm: null, hazardous: false, absoluteMagnitude: null, orbitalPeriodDays: null, firstObservationDate: null, lastObservationDate: null, closeApproachCount: 0 }));
+
+function objectName(designation: string): string {
+  return designation.replace(/^\d+\s+/, "").replace(/\s*\([^)]*\)$/, "").toLowerCase();
+}
 
 interface NasaDiameter { estimated_diameter_min?: number; estimated_diameter_max?: number; }
 interface NasaApproach {
@@ -29,6 +42,7 @@ interface NasaNeoRecord {
   };
 }
 interface NasaBrowseResponse { near_earth_objects?: NasaNeoRecord[]; }
+interface JplCatalogResponse { data?: Array<[string, string, string]>; }
 
 function nullableNumber(value: string | number | undefined): number | null {
   const number = typeof value === "number" ? value : Number(value);
@@ -95,6 +109,15 @@ async function fetchBrowsePool(): Promise<NasaNeoRecord[]> {
   return response.near_earth_objects;
 }
 
+async function fetchJplCatalog(): Promise<ExplorerObjectSummary[]> {
+  const response = await fetchJson<JplCatalogResponse>("JPL", new URL(JPL_CATALOG_URL), NASA_TIMEOUT_MS, { next: { revalidate: NASA_CACHE_SECONDS } });
+  if (!Array.isArray(response.data)) throw new ExternalApiError("JPL", "JPL returned an invalid asteroid catalog payload");
+  return response.data.flatMap(([fullName, id, name]) => {
+    if (!id || !name) return [];
+    return [{ id, designation: fullName.trim() || `${id} ${name}`, estimatedDiameterMinKm: null, estimatedDiameterMaxKm: null, hazardous: false, absoluteMagnitude: null, orbitalPeriodDays: null, firstObservationDate: null, lastObservationDate: null, closeApproachCount: 0 }];
+  });
+}
+
 async function fetchObjectRecord(id: string): Promise<NasaNeoRecord | null> {
   const url = nasaUrl(`/neo/${encodeURIComponent(id)}`);
   try {
@@ -107,14 +130,38 @@ async function fetchObjectRecord(id: string): Promise<NasaNeoRecord | null> {
 
 export async function searchNeoObjects(query: string): Promise<ExplorerObjectSummary[]> {
   const normalizedQuery = query.trim().toLowerCase();
-  if (normalizedQuery.length < 2) return [];
+  if (normalizedQuery.length < 1) return [];
   if (/^\d{3,}$/.test(normalizedQuery)) {
     const record = await fetchObjectRecord(normalizedQuery);
     const result = record ? toSummary(record) : null;
     return result ? [result] : [];
   }
-  const records = await fetchBrowsePool();
-  return records.map(toSummary).filter((record): record is ExplorerObjectSummary => Boolean(record)).filter((record) => record.designation.toLowerCase().includes(normalizedQuery) || record.id.includes(normalizedQuery)).slice(0, SEARCH_POOL_SIZE);
+  let records: NasaNeoRecord[] = [];
+  try {
+    records = await fetchBrowsePool();
+  } catch (error) {
+    if (!(error instanceof ExternalApiError)) throw error;
+  }
+  let catalog: ExplorerObjectSummary[] = [];
+  try {
+    catalog = await fetchJplCatalog();
+  } catch (error) {
+    if (!(error instanceof ExternalApiError)) throw error;
+  }
+  const matches = [...records.map(toSummary).filter((record): record is ExplorerObjectSummary => Boolean(record)), ...catalog, ...LOCAL_SUGGESTIONS]
+    .filter((record): record is ExplorerObjectSummary => Boolean(record))
+    .filter((record) => objectName(record.designation).includes(normalizedQuery) || record.id.includes(normalizedQuery))
+    .filter((record, index, matches) => matches.findIndex((candidate) => candidate.id === record.id || objectName(candidate.designation) === objectName(record.designation)) === index)
+  const prefixMatches = matches.filter((record) => objectName(record.designation).startsWith(normalizedQuery));
+  return (prefixMatches.length ? prefixMatches : matches)
+    .sort((left, right) => {
+      const leftName = objectName(left.designation);
+      const rightName = objectName(right.designation);
+      const leftStarts = leftName.startsWith(normalizedQuery) ? 0 : 1;
+      const rightStarts = rightName.startsWith(normalizedQuery) ? 0 : 1;
+      return leftStarts - rightStarts || leftName.localeCompare(rightName);
+    })
+    .slice(0, SEARCH_POOL_SIZE);
 }
 
 export async function getNeoObjectDetails(id: string): Promise<ExplorerObjectDetails | null> {

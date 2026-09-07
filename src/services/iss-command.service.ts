@@ -1,5 +1,5 @@
 import { fetchIssPosition } from "@/lib/api/iss";
-import { fetchIssPasses, fetchIssTleOrbitNumber } from "@/lib/api/n2yo";
+import { estimateIssPasses, fetchIssPasses, fetchIssTleOrbitNumber } from "@/lib/api/n2yo";
 import type { IssCommandSnapshot, IssMissionEvent, IssOrbitalInformation, IssPassResponse, IssTrailPoint } from "@/types/iss";
 import type { IssPosition } from "@/types/mission";
 import { ExternalApiError, fetchJson } from "@/lib/api/request";
@@ -131,5 +131,12 @@ async function resolveLocation(query: string): Promise<{ label: string; latitude
 
 export async function getIssPasses(query: string): Promise<IssPassResponse> {
   const location = await resolveLocation(query);
-  return { location, passes: await fetchIssPasses(location.latitude, location.longitude) };
+  try {
+    return { location, passes: await fetchIssPasses(location.latitude, location.longitude) };
+  } catch (error) {
+    if (error instanceof ExternalApiError && error.source === "N2YO" && error.message.includes("N2YO_API_KEY is undefined")) {
+      return { location, passes: await estimateIssPasses(location.latitude, location.longitude) };
+    }
+    throw error;
+  }
 }
