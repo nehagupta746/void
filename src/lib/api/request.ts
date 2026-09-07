@@ -26,7 +26,7 @@ function safeUrl(url: URL): string {
 }
 
 export function requireApiKey(name: "NASA_API_KEY" | "N2YO_API_KEY"): string {
-  const value = process.env[name];
+  const value = process.env[name] ?? (isDevelopment() && name === "NASA_API_KEY" ? "DEMO_KEY" : undefined);
   if (!value) throw new ExternalApiError(name.replace("_API_KEY", ""), `${name} is undefined`);
   if (isDevelopment() && !loggedKeys.has(name)) {
     loggedKeys.add(name);

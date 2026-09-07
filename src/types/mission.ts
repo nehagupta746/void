@@ -19,6 +19,7 @@ export interface IssPosition {
 export interface CloseApproach {
   id: string;
   name: string;
+  date: string;
   distanceKm: number;
   relativeVelocityKph: number;
   risk: "low" | "elevated" | "high";
@@ -59,6 +60,7 @@ export interface NasaNeo {
   name: string;
   is_potentially_hazardous_asteroid: boolean;
   close_approach_data: Array<{
+    close_approach_date: string;
     miss_distance: { kilometers: string };
     relative_velocity: { kilometers_per_hour: string };
   }>;

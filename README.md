@@ -46,24 +46,26 @@ The vehicle view provides an interactive technical model of the International Sp
 
 - Node.js 20 or later
 - npm 10 or later
-- NASA API key
-- N2YO API key for ISS pass data
 
 ### Installation
 
 ```bash
-git clone https://github.com/MadManGodGifted/Aster.git
-cd Aster
+git clone https://github.com/nehagupta746/void.git
+cd void
 npm install
 ```
 
-Create a local environment file from the template:
+Start the app immediately:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The mission dashboard includes fallback catalog and approach data when external providers are unavailable, so the cloned project still renders without API keys. To enable live NASA, N2YO, and CelesTrak data, copy the environment template and add your own keys:
 
 ```bash
 copy .env.example .env.local
 ```
-
-Then provide your keys:
 
 ```dotenv
 NASA_API_KEY=your_nasa_api_key
@@ -93,12 +95,12 @@ Open [http://localhost:3000](http://localhost:3000).
 
 VOID uses publicly available services through server-side API routes:
 
-- [NASA NeoWs](https://api.nasa.gov/) for NEO search and close-approach data
+- [NASA NeoWs](https://api.nasa.gov/) for live NEO search and close-approach data
 - [N2YO](https://www.n2yo.com/) for ISS pass prediction data
 - [CelesTrak](https://celestrak.org/) for satellite and orbital reference data
 - ISS position endpoints for live position telemetry
 
-Service health is surfaced to the interface as connected, degraded, or offline. Cached data is retained where possible so a temporary upstream failure does not break the dashboard.
+Service health is surfaced to the interface as connected, degraded, or offline. Fallback data is retained where possible so a temporary upstream failure does not leave the dashboard blank.
 
 ## Project structure
 

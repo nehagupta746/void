@@ -27,6 +27,6 @@ export async function fetchCloseApproaches(): Promise<CloseApproach[]> {
     if (!approach) return [];
     const distanceKm = Number(approach.miss_distance.kilometers);
     const relativeVelocityKph = Number(approach.relative_velocity.kilometers_per_hour);
-    return [{ id: neo.id, name: neo.name, distanceKm, relativeVelocityKph, risk: toRisk(neo, distanceKm) }];
+    return [{ id: neo.id, name: neo.name, date: approach.close_approach_date, distanceKm, relativeVelocityKph, risk: toRisk(neo, distanceKm) }];
   }).filter((approach) => Number.isFinite(approach.distanceKm)).sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 5);
 }
