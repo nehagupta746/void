@@ -10,7 +10,7 @@ function riskScore(approaches: CloseApproach[]): number { return approaches.redu
 function displaySourceError(source: SourceName, message: string): string {
   if (source === "nasa" && message.includes("429")) return "NASA rate limit reached; showing fallback approaches";
   if (source === "n2yo" && message.includes("undefined")) return "N2YO key missing; pass predictions unavailable";
-  if (source === "celestrak") return "CelesTrak is synchronizing; showing fallback catalog";
+  if (source === "celestrak") return "CelesTrak unavailable; showing fallback catalog";
   return `${source.toUpperCase()} data delayed`;
 }
 const fallbackSatellites = [
@@ -46,13 +46,12 @@ async function measureWithDeadline<T>(request: () => Promise<T>, deadlineMs: num
   }
 }
 function isSuccess<T>(result: MeasuredResult<T>): result is { data: T; latencyMs: number } { return "data" in result; }
-function healthFor<T>(result: MeasuredResult<T>, cached = false): ServiceHealth { return cached ? "degraded" : !isSuccess(result) ? "offline" : "connected"; }
-function overallHealth(services: Record<SourceName, ServiceHealth>): MissionSnapshot["connection"] {
-  const values = Object.values(services);
-  const offlineCount = values.filter((health) => health === "offline").length;
-  if (offlineCount === values.length) return "offline";
-  if (offlineCount >= 2) return "degraded";
-  if (offlineCount === 1 || values.includes("degraded")) return "delayed";
+function healthFor<T>(result: MeasuredResult<T>, cached = false): ServiceHealth { return !isSuccess(result) ? "offline" : cached ? "degraded" : "connected"; }
+function overallHealth(services: Record<SourceName, ServiceHealth>, hasFallbackApproaches: boolean): MissionSnapshot["connection"] {
+  const issAvailable = services.iss !== "offline";
+  const approachesAvailable = services.nasa !== "offline" || hasFallbackApproaches;
+  if (!issAvailable && !approachesAvailable) return "offline";
+  if (!issAvailable || !approachesAvailable) return "degraded";
   return "live";
 }
 
@@ -69,8 +68,8 @@ export async function getMissionSnapshot(): Promise<MissionSnapshot> {
   const satellites = celestrakData?.satellites ?? fallbackSatellites;
   const closeApproaches = isSuccess(approachesResult) ? approachesResult.data : fallbackApproaches();
   const iss = isSuccess(issResult) ? issResult.data : null;
-  const services = { celestrak: healthFor(celestrakResult, celestrakData?.cached ?? true), nasa: healthFor(approachesResult, !isSuccess(approachesResult)), iss: healthFor(issResult), n2yo: healthFor(n2yoResult) };
-  const connection = overallHealth(services);
+  const services = { celestrak: healthFor(celestrakResult, celestrakData?.cached), nasa: healthFor(approachesResult), iss: healthFor(issResult), n2yo: healthFor(n2yoResult) };
+  const connection = overallHealth(services, !isSuccess(approachesResult) && closeApproaches.length > 0);
   const hazardIndex = riskScore(closeApproaches);
   const hazardLevel = closeApproaches.some((approach) => approach.risk === "high") ? "high" : closeApproaches.some((approach) => approach.risk === "elevated") ? "elevated" : "low";
   const successfulLatencies = [

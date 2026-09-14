@@ -3,7 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchMissionSnapshot } from "@/lib/api/mission";
 
+const MISSION_REFRESH_INTERVAL_MS = 30000;
+
 export function useMissionSnapshot() {
-  const query = useQuery({ queryKey: ["mission-snapshot"], queryFn: fetchMissionSnapshot, retry: 1 });
+  const query = useQuery({ queryKey: ["mission-snapshot"], queryFn: fetchMissionSnapshot, retry: 1, refetchInterval: MISSION_REFRESH_INTERVAL_MS, refetchOnWindowFocus: true });
   return { loading: query.isLoading, error: query.error, data: query.data, refresh: query.refetch, isFetching: query.isFetching };
 }

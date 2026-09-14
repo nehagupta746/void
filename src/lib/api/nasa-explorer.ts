@@ -44,6 +44,16 @@ interface NasaNeoRecord {
 }
 interface NasaBrowseResponse { near_earth_objects?: NasaNeoRecord[]; }
 interface JplCatalogResponse { data?: Array<[string, string, string]>; }
+interface JplObjectResponse {
+  object?: { des?: string; fullname?: string; name?: string; orbit_class?: { name?: string; code?: string } };
+  phys_par?: Array<{ name?: string; value?: number | string }>;
+  orbit?: {
+    first_obs?: string;
+    last_obs?: string;
+    class?: { name?: string; code?: string };
+    elements?: Array<{ name?: string; value?: number | string }>;
+  };
+}
 
 function nullableNumber(value: string | number | undefined): number | null {
   const number = typeof value === "number" ? value : Number(value);
@@ -130,6 +140,39 @@ async function fetchObjectRecord(id: string): Promise<NasaNeoRecord | null> {
   }
 }
 
+async function fetchJplObjectDetails(id: string): Promise<ExplorerObjectDetails | null> {
+  const url = new URL("https://ssd-api.jpl.nasa.gov/sbdb.api");
+  url.searchParams.set("sstr", id);
+  url.searchParams.set("phys-par", "true");
+  try {
+    const response = await fetchJson<JplObjectResponse>("JPL", url, NASA_TIMEOUT_MS, { next: { revalidate: NASA_CACHE_SECONDS } });
+    const object = response.object;
+    if (!object) return null;
+    const designation = object.fullname?.trim() || object.name?.trim() || `${id}`;
+    const elements = new Map((response.orbit?.elements ?? []).map((element) => [element.name, element.value]));
+    const physicalParameters = new Map((response.phys_par ?? []).map((parameter) => [parameter.name, parameter.value]));
+    const diameterKm = nullableNumber(physicalParameters.get("diameter"));
+    return {
+      id: object.des?.trim() || id,
+      designation,
+      estimatedDiameterMinKm: diameterKm,
+      estimatedDiameterMaxKm: diameterKm,
+      hazardous: false,
+      absoluteMagnitude: nullableNumber(physicalParameters.get("H")),
+      orbitalPeriodDays: nullableNumber(elements.get("per")),
+      firstObservationDate: response.orbit?.first_obs ?? null,
+      lastObservationDate: response.orbit?.last_obs ?? null,
+      closeApproachCount: 0,
+      orbitalClass: object.orbit_class?.name ?? object.orbit_class?.code ?? null,
+      discoveryDate: response.orbit?.first_obs ?? null,
+      approaches: [],
+    };
+  } catch (error) {
+    if (error instanceof ExternalApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export async function searchNeoObjects(query: string): Promise<ExplorerObjectSummary[]> {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.length < 1) return [];
@@ -169,6 +212,15 @@ export async function searchNeoObjects(query: string): Promise<ExplorerObjectSum
 }
 
 export async function getNeoObjectDetails(id: string): Promise<ExplorerObjectDetails | null> {
-  const record = await fetchObjectRecord(id);
-  return record ? toDetails(record) : null;
+  let nasaError: unknown;
+  try {
+    const record = await fetchObjectRecord(id);
+    if (record) return toDetails(record);
+  } catch (error) {
+    nasaError = error;
+  }
+  const jplDetails = await fetchJplObjectDetails(id);
+  if (jplDetails) return jplDetails;
+  if (nasaError) throw nasaError;
+  return null;
 }

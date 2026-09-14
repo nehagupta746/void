@@ -134,7 +134,7 @@ export async function getIssPasses(query: string): Promise<IssPassResponse> {
   try {
     return { location, passes: await fetchIssPasses(location.latitude, location.longitude) };
   } catch (error) {
-    if (error instanceof ExternalApiError && error.source === "N2YO" && error.message.includes("N2YO_API_KEY is undefined")) {
+    if (error instanceof ExternalApiError && error.source === "N2YO") {
       return { location, passes: await estimateIssPasses(location.latitude, location.longitude) };
     }
     throw error;

@@ -9,7 +9,8 @@ const statusCopy: Record<ConnectionState, { label: string; tone: "operational" |
 
 export function StatusIndicator() {
   const { loading, error, data, isFetching } = useMissionSnapshot();
-  const state: ConnectionState = error ? "offline" : loading ? "connecting" : isFetching ? "syncing" : data?.connection ?? "offline";
+  const coreLive = data?.services.iss === "connected" && (data.services.nasa === "connected" || data.closeApproaches.length > 0);
+  const state: ConnectionState = error ? "offline" : loading ? "connecting" : isFetching ? "syncing" : coreLive ? "live" : data?.connection ?? "offline";
   const status = statusCopy[state];
   const healthTitle = data ? Object.entries(data.services).map(([service, health]) => `${service.toUpperCase()}: ${health}`).join(" | ") : undefined;
   return <StatusChip tone={status.tone} title={healthTitle}>{status.label}</StatusChip>;
