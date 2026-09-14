@@ -6,6 +6,7 @@ const NASA_TIMEOUT_MS = 12000;
 const NASA_CACHE_SECONDS = 900;
 const SEARCH_POOL_SIZE = 40;
 const JPL_CATALOG_URL = "https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,pdes,name&sb-kind=a&limit=10000";
+const REFERENCE_EXPLORER_URL = "https://aster-eosin.vercel.app";
 
 const LOCAL_SUGGESTIONS: ExplorerObjectSummary[] = [
   "1 Ceres", "2 Pallas", "3 Juno", "4 Vesta", "433 Eros", "951 Gaspra", "1221 Amor", "1566 Icarus",
@@ -54,6 +55,7 @@ interface JplObjectResponse {
     elements?: Array<{ name?: string; value?: number | string }>;
   };
 }
+interface ReferenceObjectResponse { object?: ExplorerObjectDetails | null; }
 
 function nullableNumber(value: string | number | undefined): number | null {
   const number = typeof value === "number" ? value : Number(value);
@@ -173,6 +175,12 @@ async function fetchJplObjectDetails(id: string): Promise<ExplorerObjectDetails 
   }
 }
 
+async function fetchReferenceObjectDetails(id: string): Promise<ExplorerObjectDetails | null> {
+  const url = new URL(`${REFERENCE_EXPLORER_URL}/api/explorer/object/${encodeURIComponent(id)}`);
+  const response = await fetchJson<ReferenceObjectResponse>("Reference explorer", url, NASA_TIMEOUT_MS, { next: { revalidate: NASA_CACHE_SECONDS } });
+  return response.object ?? null;
+}
+
 export async function searchNeoObjects(query: string): Promise<ExplorerObjectSummary[]> {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.length < 1) return [];
@@ -212,12 +220,20 @@ export async function searchNeoObjects(query: string): Promise<ExplorerObjectSum
 }
 
 export async function getNeoObjectDetails(id: string): Promise<ExplorerObjectDetails | null> {
+  const numericId = Number(id);
+  const nasaId = Number.isInteger(numericId) && numericId > 0 && numericId < 2000000 ? `200${id}` : id;
   let nasaError: unknown;
   try {
-    const record = await fetchObjectRecord(id);
+    const record = await fetchObjectRecord(nasaId);
     if (record) return toDetails(record);
   } catch (error) {
     nasaError = error;
+  }
+  try {
+    const referenceObject = await fetchReferenceObjectDetails(nasaId);
+    if (referenceObject) return referenceObject;
+  } catch (referenceError) {
+    if (!(referenceError instanceof ExternalApiError)) throw referenceError;
   }
   const jplDetails = await fetchJplObjectDetails(id);
   if (jplDetails) return jplDetails;
