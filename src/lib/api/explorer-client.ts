@@ -1,9 +1,8 @@
 import { fetchClientJson } from "@/lib/performance/client-request";
-import type { ExplorerObjectDetails, ExplorerObjectSummary } from "@/types/explorer";
+import type { ExplorerObjectDetails, ExplorerSearchResponse } from "@/types/explorer";
 
-export async function fetchExplorerSearch(query: string): Promise<ExplorerObjectSummary[]> {
-  const response = await fetchClientJson<{ results: ExplorerObjectSummary[] }>(`/api/explorer/search?q=${encodeURIComponent(query)}`, "explorer search");
-  return response.results;
+export async function fetchExplorerSearch(query: string): Promise<ExplorerSearchResponse> {
+  return fetchClientJson<ExplorerSearchResponse>(`/api/explorer/search?q=${encodeURIComponent(query)}`, "explorer search");
 }
 
 export async function fetchExplorerObject(id: string): Promise<ExplorerObjectDetails> {

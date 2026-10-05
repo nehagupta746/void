@@ -8,9 +8,9 @@ const DETAIL_STALE_TIME_MS = 900000;
 
 export function useExplorerSearch(query: string) {
   const normalizedQuery = query.trim();
-  return useQuery({ queryKey: ["neo-search", normalizedQuery], queryFn: () => fetchExplorerSearch(normalizedQuery), enabled: normalizedQuery.length >= 1, staleTime: SEARCH_STALE_TIME_MS, gcTime: SEARCH_STALE_TIME_MS, retry: 1 });
+  return useQuery({ queryKey: ["neo-search-v8", normalizedQuery], queryFn: () => fetchExplorerSearch(normalizedQuery), enabled: normalizedQuery.length >= 0, staleTime: (query) => query.state.data?.degraded ? 0 : SEARCH_STALE_TIME_MS, gcTime: SEARCH_STALE_TIME_MS, retry: 0 });
 }
 
 export function useExplorerObject(id: string | null) {
-  return useQuery({ queryKey: ["neo-object", id], queryFn: () => fetchExplorerObject(id ?? ""), enabled: Boolean(id), staleTime: DETAIL_STALE_TIME_MS, gcTime: DETAIL_STALE_TIME_MS, retry: 1 });
+  return useQuery({ queryKey: ["neo-object-v6", id], queryFn: () => fetchExplorerObject(id ?? ""), enabled: Boolean(id), staleTime: DETAIL_STALE_TIME_MS, gcTime: DETAIL_STALE_TIME_MS, retry: 1 });
 }
