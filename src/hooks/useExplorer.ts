@@ -8,7 +8,7 @@ const DETAIL_STALE_TIME_MS = 900000;
 
 export function useExplorerSearch(query: string) {
   const normalizedQuery = query.trim();
-  return useQuery({ queryKey: ["neo-search-v8", normalizedQuery], queryFn: () => fetchExplorerSearch(normalizedQuery), enabled: normalizedQuery.length > 0, staleTime: (query) => query.state.data?.degraded ? 0 : SEARCH_STALE_TIME_MS, gcTime: SEARCH_STALE_TIME_MS, retry: 0 });
+  return useQuery({ queryKey: ["neo-search-v8", normalizedQuery], queryFn: () => fetchExplorerSearch(normalizedQuery), enabled: true, staleTime: (query) => query.state.data?.degraded ? 0 : SEARCH_STALE_TIME_MS, gcTime: SEARCH_STALE_TIME_MS, retry: 0 });
 }
 
 export function useExplorerObject(id: string | null) {
