@@ -2,8 +2,10 @@
 
 import { motion } from "framer-motion";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useSpaceAssistantPublisher } from "@/components/assistant/SpaceAssistantContext";
 import { CommandButton } from "@/components/ui/CommandButton";
 import { HUDPanel } from "@/components/ui/HUDPanel";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { useExplorerObject, useExplorerSearch } from "@/hooks/useExplorer";
 import type { ExplorerApproach, ExplorerObjectDetails, ExplorerObjectSummary } from "@/types/explorer";
@@ -96,8 +98,8 @@ function renderThreatBar(value: number | null): string {
   return `${"█".repeat(Math.max(0, filled))}${"░".repeat(Math.max(0, 10 - filled))}`;
 }
 
-const Field = memo(function Field({ label, value }: { label: string; value: string }) {
-  return <div className="border-t border-[var(--color-line)] pt-[var(--space-1)]"><p className="m-0 text-[0.5625rem] uppercase tracking-[0.15em] text-[var(--color-muted)]">{label}</p><p className="m-0 mt-1 break-words text-xs uppercase tracking-[0.06em] text-[var(--color-information)]">{value}</p></div>;
+const Field = memo(function Field({ label, value, help }: { label: string; value: string; help?: string }) {
+  return <div className="border-t border-[var(--color-line)] pt-[var(--space-1)]"><div className="flex items-center gap-1"><p className="m-0 text-[0.5625rem] uppercase tracking-[0.15em] text-[var(--color-muted)]">{label}</p>{help && <InfoTooltip label={label} content={help} />}</div><p className="m-0 mt-1 break-words text-xs uppercase tracking-[0.06em] text-[var(--color-information)]">{value}</p></div>;
 });
 
 const ApproachAlerts = memo(function ApproachAlerts({ approaches, hazardous, earthMoidAu }: { approaches: ExplorerApproach[]; hazardous: boolean | null; earthMoidAu: number | null }) {
@@ -142,22 +144,27 @@ const ObjectDetailsPanel = memo(function ObjectDetailsPanel({ object, loading, e
           <Field label="NASA NEO ID" value={object.nasaId ?? "No NASA NEO identifier"} />
           <Field label="Orbital class / meaning" value={`${object.orbitalClass ?? "Data unavailable"} / ${orbitalClassExplanation(object.orbitalClass)}`} />
           <Field label="Diameter" value={formatDiameterRange(object.estimatedDiameterMinKm, object.estimatedDiameterMaxKm)} />
-          <Field label="Absolute magnitude (H)" value={formatValue(object.absoluteMagnitude)} />
-          <Field label="Orbital period" value={formatValue(object.orbitalPeriodDays, " days")} />
-          <Field label="Semi-major axis" value={formatValue(object.semiMajorAxisAu ?? null, " AU")} />
-          <Field label="Eccentricity" value={formatValue(object.eccentricity ?? null)} />
-          <Field label="Inclination" value={formatValue(object.inclinationDegrees ?? null, "°")} />
-          <Field label="Perihelion distance" value={formatValue(object.perihelionDistanceAu ?? null, " AU")} />
-          <Field label="Earth MOID" value={formatValue(object.earthMoidAu ?? null, " AU")} />
-          <Field label="Near-Earth object" value={object.isNearEarthObject === true ? "Yes" : object.isNearEarthObject === false ? "No" : "Data unavailable"} />
           <Field label="Threat classification" value={threatLabel(object.hazardous)} />
-          <Field label="Discovery date" value={formatDate(object.discoveryDate)} />
-          <Field label="Last observed" value={formatDate(object.lastObservationDate)} />
         </div>
+        <details className="disclosure-panel mt-[var(--space-2)]">
+          <summary>Orbital parameters and catalog details</summary>
+          <div className="grid gap-[var(--space-2)] p-[var(--space-2)] sm:grid-cols-2">
+            <Field label="Absolute magnitude (H)" value={formatValue(object.absoluteMagnitude)} help="H magnitude is a size proxy when direct size data is unavailable." />
+            <Field label="Orbital period" value={formatValue(object.orbitalPeriodDays, " days")} />
+            <Field label="Semi-major axis" value={formatValue(object.semiMajorAxisAu ?? null, " AU")} />
+            <Field label="Eccentricity" value={formatValue(object.eccentricity ?? null)} />
+            <Field label="Inclination" value={formatValue(object.inclinationDegrees ?? null, "°")} />
+            <Field label="Perihelion distance" value={formatValue(object.perihelionDistanceAu ?? null, " AU")} />
+            <Field label="Earth MOID" value={formatValue(object.earthMoidAu ?? null, " AU")} help="MOID is orbit geometry, not a predicted encounter." />
+            <Field label="Near-Earth object" value={object.isNearEarthObject === true ? "Yes" : object.isNearEarthObject === false ? "No" : "Data unavailable"} />
+            <Field label="Discovery date" value={formatDate(object.discoveryDate)} />
+            <Field label="Last observed" value={formatDate(object.lastObservationDate)} />
+          </div>
+        </details>
         {threat && (
-          <div className="mt-[var(--space-3)]">
-            <SectionHeader index="//" title="Threat assessment" detail={assessmentValue} />
-            <div className="mt-[var(--space-2)] border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-2)]">
+          <details className="disclosure-panel mt-[var(--space-2)]">
+            <summary><span>Threat assessment</span><span>{assessmentValue}</span></summary>
+            <div className="border-t border-[var(--color-line)] p-[var(--space-2)]">
               <p className="m-0 text-[0.625rem] uppercase tracking-[0.18em] text-[var(--color-accent)]">VOID THREAT ASSESSMENT</p>
               <p className="m-0 mt-2 text-2xl font-medium uppercase tracking-[0.12em] text-[var(--color-information)]">{assessmentValue}</p>
               <p className="m-0 mt-2 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">Catalog-based heuristic; H magnitude and Earth MOID are labeled proxies when direct size or encounter data is unavailable. Not an official risk rating.</p>
@@ -176,25 +183,29 @@ const ObjectDetailsPanel = memo(function ObjectDetailsPanel({ object, loading, e
                 </div>
               ))}
             </div>
-          </div>
+          </details>
         )}
-        <div className="mt-[var(--space-3)]">
-          <SectionHeader index="//" title="Close approach alerts" detail={object.approaches.length ? `${object.approaches.length} recorded` : "No alerts"} />
-          {closest && (
-            <div className="mb-[var(--space-2)] border border-[var(--color-primary)]/50 bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-1)]">
-              <p className="m-0 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-accent)]">Closest recorded approach / {formatDate(closest.date)}</p>
-              <div className="mt-1 grid grid-cols-2 gap-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em]">
-                <span className="text-[var(--color-information)]">Miss distance: {formatCompact(closest.missDistanceKm, " km")}</span>
-                <span className="text-[var(--color-information)]">Relative velocity: {formatVelocity(closest.relativeVelocityKph)}</span>
+        <details className="disclosure-panel mt-[var(--space-2)]">
+          <summary><span>Close approach alerts</span><span>{object.approaches.length ? `${object.approaches.length} recorded` : "No alerts"}</span></summary>
+          <div className="border-t border-[var(--color-line)] p-[var(--space-2)]">
+            {closest && (
+              <div className="mb-[var(--space-2)] border border-[var(--color-primary)]/50 bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-1)]">
+                <p className="m-0 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-accent)]">Closest recorded approach / {formatDate(closest.date)}</p>
+                <div className="mt-1 grid grid-cols-2 gap-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em]">
+                  <span className="text-[var(--color-information)]">Miss distance: {formatCompact(closest.missDistanceKm, " km")}</span>
+                  <span className="text-[var(--color-information)]">Relative velocity: {formatVelocity(closest.relativeVelocityKph)}</span>
+                </div>
               </div>
-            </div>
-          )}
-          <ApproachAlerts approaches={object.approaches} hazardous={object.hazardous} earthMoidAu={object.earthMoidAu ?? null} />
-        </div>
-        <div className="mt-[var(--space-3)]">
-          <SectionHeader index="//" title="Approach timeline" detail={`${object.approaches.length} recorded`} />
-          <ApproachTimeline approaches={object.approaches} earthMoidAu={object.earthMoidAu ?? null} />
-        </div>
+            )}
+            <ApproachAlerts approaches={object.approaches} hazardous={object.hazardous} earthMoidAu={object.earthMoidAu ?? null} />
+          </div>
+        </details>
+        <details className="disclosure-panel mt-[var(--space-2)]">
+          <summary><span>Approach timeline</span><span>{`${object.approaches.length} recorded`}</span></summary>
+          <div className="border-t border-[var(--color-line)] p-[var(--space-2)]">
+            <ApproachTimeline approaches={object.approaches} earthMoidAu={object.earthMoidAu ?? null} />
+          </div>
+        </details>
       </HUDPanel>
     </motion.div>
   );
@@ -212,7 +223,43 @@ function approachSummary(object: ExplorerObjectSummary): string {
 }
 
 const SearchResult = memo(function SearchResult({ object, selected, onSelect }: { object: ExplorerObjectSummary; selected: boolean; onSelect: (id: string) => void }) {
-  return <button type="button" onClick={() => onSelect(object.id)} aria-pressed={selected} className={`command-button w-full border px-[var(--space-2)] py-[var(--space-1)] text-left transition-colors duration-[var(--motion-slow)] ${selected ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10" : "border-[var(--color-line)] bg-[var(--color-panel)] hover:border-[var(--color-primary)]"}`}><div className="flex items-start justify-between gap-[var(--space-2)]"><div><p className="m-0 text-xs uppercase tracking-[0.1em] text-[var(--color-information)]">{object.designation}</p><p className="m-0 mt-1 text-[0.625rem] uppercase tracking-[0.1em] text-[var(--color-muted)]">{object.nasaId ? `NASA NEO ID / ${object.nasaId}` : `JPL designation / ${object.id}`}</p></div><span className={object.hazardous === true ? "text-[0.625rem] uppercase tracking-[0.12em] text-[var(--color-danger)]" : "text-[0.625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]"}>Threat / {object.hazardous === true ? "potentially hazardous" : object.hazardous === false ? "not classified hazardous" : "unavailable"}</span></div><div className="mt-[var(--space-1)] grid grid-cols-2 gap-x-[var(--space-2)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-muted)] sm:grid-cols-3"><span>H / {formatValue(object.absoluteMagnitude)}</span><span>Diameter / {formatDiameterRange(object.estimatedDiameterMinKm, object.estimatedDiameterMaxKm)}</span><span>Orbital period / {formatCompact(object.orbitalPeriodDays, " days")}</span><span>Orbit class / {object.orbitalClassCode ?? "Unavailable"}</span><span>Semi-major axis / {formatValue(object.semiMajorAxisAu ?? null, " AU")}</span><span>Eccentricity / {formatValue(object.eccentricity ?? null)}</span><span>Inclination / {formatValue(object.inclinationDegrees ?? null, "°")}</span><span>Perihelion / {formatValue(object.perihelionDistanceAu ?? null, " AU")}</span><span>Earth MOID / {formatValue(object.earthMoidAu ?? null, " AU")}</span><span>{approachSummary(object)}</span><span>Last observed / {object.lastObservationDate ? formatDate(object.lastObservationDate) : "Unavailable"}</span><span>PHA / {object.hazardous === true ? "Yes" : object.hazardous === false ? "No" : "Unavailable"}</span><span>NEO / {object.isNearEarthObject === true ? "Yes" : object.isNearEarthObject === false ? "No" : "Unavailable"}</span><span className="col-span-full border-t border-[var(--color-line)] pt-1 text-[var(--color-primary)]">Select to load this object's closest approach, alerts and full timeline</span></div></button>;
+  return (
+    <article className="registry-result overflow-hidden border border-[var(--color-line)] bg-[var(--color-panel)]">
+      <button
+        type="button"
+        onClick={() => onSelect(object.id)}
+        aria-pressed={selected}
+        className={`command-button w-full border-0 px-[var(--space-2)] py-[var(--space-1)] text-left transition-colors duration-[var(--motion-slow)] ${selected ? "bg-[var(--color-primary)]/10" : "hover:bg-[var(--color-panel-raised)]"}`}
+      >
+        <div className="flex items-start justify-between gap-[var(--space-2)]">
+          <div>
+            <p className="m-0 text-xs uppercase tracking-[0.1em] text-[var(--color-information)]">{object.designation}</p>
+            <p className="m-0 mt-1 text-[0.625rem] uppercase tracking-[0.1em] text-[var(--color-muted)]">{object.nasaId ? `NASA NEO ID / ${object.nasaId}` : `JPL designation / ${object.id}`}</p>
+          </div>
+          <span className={object.hazardous === true ? "text-[0.625rem] uppercase tracking-[0.12em] text-[var(--color-danger)]" : "text-[0.625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]"}>Threat / {object.hazardous === true ? "potentially hazardous" : object.hazardous === false ? "not classified hazardous" : "unavailable"}</span>
+        </div>
+        <p className="m-0 mt-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-muted)]">Diameter / {formatDiameterRange(object.estimatedDiameterMinKm, object.estimatedDiameterMaxKm)}</p>
+        <p className="m-0 mt-1 text-[0.5625rem] uppercase tracking-[0.08em] text-[var(--color-muted)]">{approachSummary(object)}</p>
+      </button>
+      <details className="disclosure-panel border-x-0 border-b-0">
+        <summary>Technical details</summary>
+        <div className="grid grid-cols-2 gap-x-[var(--space-2)] gap-y-[var(--space-1)] border-t border-[var(--color-line)] p-[var(--space-2)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-muted)] sm:grid-cols-3">
+          <span>H / {formatValue(object.absoluteMagnitude)}</span>
+          <span>Orbital period / {formatCompact(object.orbitalPeriodDays, " days")}</span>
+          <span>Orbit class / {object.orbitalClassCode ?? "Unavailable"}</span>
+          <span>Semi-major axis / {formatValue(object.semiMajorAxisAu ?? null, " AU")}</span>
+          <span>Eccentricity / {formatValue(object.eccentricity ?? null)}</span>
+          <span>Inclination / {formatValue(object.inclinationDegrees ?? null, "°")}</span>
+          <span>Perihelion / {formatValue(object.perihelionDistanceAu ?? null, " AU")}</span>
+          <span>Earth MOID / {formatValue(object.earthMoidAu ?? null, " AU")}</span>
+          <span>Last observed / {object.lastObservationDate ? formatDate(object.lastObservationDate) : "Unavailable"}</span>
+          <span>PHA / {object.hazardous === true ? "Yes" : object.hazardous === false ? "No" : "Unavailable"}</span>
+          <span>NEO / {object.isNearEarthObject === true ? "Yes" : object.isNearEarthObject === false ? "No" : "Unavailable"}</span>
+          <span className="col-span-full border-t border-[var(--color-line)] pt-1 text-[var(--color-primary)]">Select to load this object's closest approach, alerts and full timeline</span>
+        </div>
+      </details>
+    </article>
+  );
 });
 
 const ComparisonPanel = memo(function ComparisonPanel({ left, right }: { left: ExplorerObjectDetails | undefined; right: ExplorerObjectDetails | undefined }) {
@@ -228,7 +275,7 @@ const ComparisonPanel = memo(function ComparisonPanel({ left, right }: { left: E
     { label: "Closest orbital proximity (Earth MOID)", value: (object: ExplorerObjectDetails | undefined) => object ? formatValue(object.earthMoidAu ?? null, " AU") : "Data unavailable" },
     { label: "Orbit class", value: (object: ExplorerObjectDetails | undefined) => object?.orbitalClass ?? "Data unavailable" },
   ];
-  return <HUDPanel title="Object comparison" eyebrow="A / B matrix"><div className="grid gap-[var(--space-2)] sm:grid-cols-2"><div className="border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-1)]"><p className="m-0 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">OBJECT A</p><p className="m-0 mt-1 text-xs uppercase tracking-[0.08em] text-[var(--color-information)]">{left?.designation ?? "Awaiting selection"}</p></div><div className="border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-1)]"><p className="m-0 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">OBJECT B</p><p className="m-0 mt-1 text-xs uppercase tracking-[0.08em] text-[var(--color-information)]">{right?.designation ?? "Awaiting selection"}</p></div></div><div className="mt-[var(--space-2)] space-y-[var(--space-1)]">{rows.map((row) => <div key={row.label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-[var(--space-1)] border-b border-[var(--color-line)] pb-[var(--space-1)] text-[0.5625rem] uppercase tracking-[0.08em]"><span className="text-[var(--color-muted)]">{row.label}</span><span className="text-[var(--color-information)]">{row.value(left)}</span><span className="text-[var(--color-primary)]">{row.value(right)}</span></div>)}</div></HUDPanel>;
+  return <HUDPanel title="Object comparison" eyebrow="A / B matrix"><div className="grid gap-[var(--space-2)] sm:grid-cols-2"><div className="border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-1)]"><p className="m-0 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">OBJECT A</p><p className="m-0 mt-1 text-xs uppercase tracking-[0.08em] text-[var(--color-information)]">{left?.designation ?? "Awaiting selection"}</p></div><div className="border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-2)] py-[var(--space-1)]"><p className="m-0 text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">OBJECT B</p><p className="m-0 mt-1 text-xs uppercase tracking-[0.08em] text-[var(--color-information)]">{right?.designation ?? "Awaiting selection"}</p></div></div><div className="mt-[var(--space-2)] space-y-[var(--space-1)]">{rows.map((row) => <div key={row.label} className="grid grid-cols-1 gap-[var(--space-1)] border-b border-[var(--color-line)] pb-[var(--space-1)] text-[0.5625rem] uppercase tracking-[0.08em] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]"><span className="text-[var(--color-muted)]">{row.label}</span><span className="break-words text-[var(--color-information)]">{row.value(left)}</span><span className="break-words text-[var(--color-primary)]">{row.value(right)}</span></div>)}</div></HUDPanel>;
 });
 
 export function ExplorerConsole() {
@@ -242,11 +289,20 @@ export function ExplorerConsole() {
   const details = useExplorerObject(selectedId);
   const compareLeft = useExplorerObject(compareAId);
   const compareRight = useExplorerObject(compareBId);
+  const publishPageData = useSpaceAssistantPublisher();
   const isCurrentQuery = input.trim() === query.trim();
   const results = isCurrentQuery ? search.data?.results ?? [] : [];
   const selectedDetails = mergeObjectSummary(details.data, results.find((object) => object.id === selectedId));
   const compareLeftDetails = mergeObjectSummary(compareLeft.data, results.find((object) => object.id === compareAId));
   const compareRightDetails = mergeObjectSummary(compareRight.data, results.find((object) => object.id === compareBId));
+  useEffect(() => {
+    publishPageData({
+      page: "explorer",
+      status: details.error ? "error" : details.isFetching ? "loading" : selectedDetails ? "ready" : "unavailable",
+      error: details.error?.message,
+      object: selectedDetails,
+    });
+  }, [details.error, details.isFetching, publishPageData, selectedDetails]);
   useEffect(() => {
     if (!isCurrentQuery || search.isFetching || search.error || results.length === 0) {
       setSelectedId(null);
@@ -269,12 +325,14 @@ export function ExplorerConsole() {
         <p className="m-0 text-[0.625rem] uppercase tracking-[0.2em] text-[var(--color-accent)]">02 / Orbital Intelligence</p>
         <h1 className="m-0 mt-2 font-[var(--font-display)] text-3xl uppercase tracking-[0.08em]">Explorer Terminal</h1>
       </div>
-      <form onSubmit={submitSearch} className="flex flex-col gap-[var(--space-1)] sm:flex-row">
-        <input value={input} onChange={(event) => setInput(event.target.value)} aria-label="Search asteroid registry" placeholder="TARGET ACQUISITION / DESIGNATION OR NASA ID..." className="hud-input min-h-11 flex-1 border border-[var(--color-line)] px-[var(--space-2)] text-xs uppercase tracking-[0.12em] text-[var(--color-information)] outline-none placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary)]" />
-        <CommandButton type="submit">Acquire target</CommandButton>
-      </form>
+      <HUDPanel title="Object search" eyebrow="Lookup / NASA registry">
+        <form onSubmit={submitSearch} className="flex flex-col gap-[var(--space-1)] sm:flex-row">
+          <input value={input} onChange={(event) => setInput(event.target.value)} aria-label="Search asteroid registry" placeholder="TARGET ACQUISITION / DESIGNATION OR NASA ID..." className="hud-input min-h-11 flex-1 border border-[var(--color-line)] px-[var(--space-2)] text-xs uppercase tracking-[0.12em] text-[var(--color-information)] outline-none placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary)]" />
+          <CommandButton type="submit">Acquire target</CommandButton>
+        </form>
+      </HUDPanel>
       <div className="grid gap-[var(--space-2)] lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div>
+        <div className="min-w-0">
           <SectionHeader index="//" title="Object registry" detail={registryDetail} />
           <div
             aria-label="Asteroid search results"
@@ -292,17 +350,18 @@ export function ExplorerConsole() {
           </div>
           {results.length > 0 && (
             <div className="mt-[var(--space-2)] space-y-[var(--space-1)]">
+              <SectionHeader index="//" title="Comparison targets" detail="Select A / B" />
               <div className="grid gap-[var(--space-1)] sm:grid-cols-2">
                 <label className="text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">
                   <span className="mb-1 block">Object A</span>
-                  <select value={compareAId ?? ""} onChange={(event) => setCompareAId(event.target.value)} className="hud-input w-full border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-1)] py-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-information)] outline-none focus:border-[var(--color-primary)]">
+                  <select value={compareAId ?? ""} onChange={(event) => setCompareAId(event.target.value)} className="hud-input hud-select min-h-11 w-full border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-1)] py-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-information)] outline-none focus:border-[var(--color-primary)]">
                     <option value="">Select target</option>
                     {results.map((object) => <option key={`${object.id}-a`} value={object.id}>{object.designation}</option>)}
                   </select>
                 </label>
                 <label className="text-[0.5625rem] uppercase tracking-[0.12em] text-[var(--color-muted)]">
                   <span className="mb-1 block">Object B</span>
-                  <select value={compareBId ?? ""} onChange={(event) => setCompareBId(event.target.value)} className="hud-input w-full border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-1)] py-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-information)] outline-none focus:border-[var(--color-primary)]">
+                  <select value={compareBId ?? ""} onChange={(event) => setCompareBId(event.target.value)} className="hud-input hud-select min-h-11 w-full border border-[var(--color-line)] bg-[var(--color-panel)] px-[var(--space-1)] py-[var(--space-1)] text-[0.625rem] uppercase tracking-[0.08em] text-[var(--color-information)] outline-none focus:border-[var(--color-primary)]">
                     <option value="">Select target</option>
                     {results.map((object) => <option key={`${object.id}-b`} value={object.id}>{object.designation}</option>)}
                   </select>

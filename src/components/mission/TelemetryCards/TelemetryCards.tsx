@@ -26,7 +26,7 @@ export const TelemetryCards = memo(function TelemetryCards() {
   const { data, loading, error } = useTelemetry();
   const unavailable = loading || Boolean(error);
   const loadingLabel = loading ? "Synchronizing..." : error ? "Unavailable" : undefined;
-  return <div className="mt-[var(--space-2)] grid grid-cols-2 gap-[var(--space-1)] sm:grid-cols-4">
+  return <div className="mt-[var(--space-2)] grid grid-cols-2 gap-[var(--space-1)]">
     <TelemetryCard label="Tracked objects" value={unavailable ? loadingLabel : undefined}>{unavailable || data?.trackedObjects === null ? "Receiving orbital data..." : <AnimatedNumber value={data?.trackedObjects} />}</TelemetryCard>
     <TelemetryCard label="Close approaches" tone="accent" value={unavailable ? loadingLabel : undefined}>{unavailable || data?.closeApproaches === null ? "Analyzing approaches..." : <AnimatedNumber value={data?.closeApproaches} />}</TelemetryCard>
     <TelemetryCard label="Hazard index" tone="warning" value={unavailable ? loadingLabel : undefined}>{unavailable ? loadingLabel : data?.hazardLevel?.toUpperCase() ?? "Analyzing approaches..."}</TelemetryCard>
