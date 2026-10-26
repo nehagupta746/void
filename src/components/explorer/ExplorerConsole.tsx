@@ -292,9 +292,12 @@ export function ExplorerConsole() {
   const publishPageData = useSpaceAssistantPublisher();
   const isCurrentQuery = input.trim() === query.trim();
   const results = isCurrentQuery ? search.data?.results ?? [] : [];
-  const selectedDetails = mergeObjectSummary(details.data, results.find((object) => object.id === selectedId));
-  const compareLeftDetails = mergeObjectSummary(compareLeft.data, results.find((object) => object.id === compareAId));
-  const compareRightDetails = mergeObjectSummary(compareRight.data, results.find((object) => object.id === compareBId));
+  const selectedSummary = results.find((object) => object.id === selectedId);
+  const compareLeftSummary = results.find((object) => object.id === compareAId);
+  const compareRightSummary = results.find((object) => object.id === compareBId);
+  const selectedDetails = useMemo(() => mergeObjectSummary(details.data, selectedSummary), [details.data, selectedSummary]);
+  const compareLeftDetails = useMemo(() => mergeObjectSummary(compareLeft.data, compareLeftSummary), [compareLeft.data, compareLeftSummary]);
+  const compareRightDetails = useMemo(() => mergeObjectSummary(compareRight.data, compareRightSummary), [compareRight.data, compareRightSummary]);
   useEffect(() => {
     publishPageData({
       page: "explorer",
